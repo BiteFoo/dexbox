@@ -41,7 +41,7 @@ static tb_bool_t dx_file_check_magic(dx_header_ref_t header)
     if (tb_memcmp(magic, DX_MAGIC, 4)) 
     {
         // trace
-        tb_trace_e("invalid magic number: %02x %02x %02x %02x", magic[0], magic[1], magic[2], magic[3]);
+        printf("[-] invalid magic number: %02x %02x %02x %02x", magic[0], magic[1], magic[2], magic[3]);
         return tb_false;
     }
 
@@ -50,9 +50,11 @@ static tb_bool_t dx_file_check_magic(dx_header_ref_t header)
     if (tb_memcmp(version, DX_MAGIC_VERSION, 4) && tb_memcmp(version, DX_MAGIC_VERSION_API_13, 4))
     {
         // trace
-        tb_trace_e("unsupported dex version: %02x %02x %02x %02x", version[0], version[1], version[2], version[3]);
+        printf("[-] unsupported dex version: %02x %02x %02x %02x", version[0], version[1], version[2], version[3]);
         return tb_false;
     }
+
+    printf("[+] dex header check ok\n" );
 
     // ok
     return tb_true;
@@ -74,6 +76,7 @@ static tb_bool_t dx_file_check_adler(dx_header_ref_t header)
         return tb_false;
     }
 
+    printf("[+] check adler ok\n");
     // ok?
     return tb_true;
 }
@@ -322,6 +325,7 @@ dx_file_ref_t dx_file_load_from_url(tb_char_t const* url, tb_bool_t checksum)
     dx_file_ref_t   dexfile = tb_null;
     do
     {
+        printf("[+] dexfile  at: %s\n",url);
         // init stream
         stream = tb_stream_init_from_url(url);
         tb_assert_and_check_break(stream);
@@ -337,18 +341,28 @@ dx_file_ref_t dx_file_load_from_url(tb_char_t const* url, tb_bool_t checksum)
         data = (tb_byte_t*)tb_align_malloc(size, 8);
         tb_assert_and_check_break(data);
 
+
         // read data from the stream
         if (!tb_stream_bread(stream, data, size)) break;
+        // printf("--> read stream size done!! data ==  NULL ?? : %d\n ",data == NULL);
 
         // load dex from data 
         dexfile = dx_file_load_from_data(data, size, checksum);
+        // tb_trace_d("[+] load dexfile ok!\n");
         tb_check_break(dexfile);
+        // printf("[+] load dex file ok  dexfile : %p \n",dexfile);
 
         // mark as owner of the data
         ((dx_file_t*)dexfile)->owner = tb_true;
 
     } while (0);
 
+    // ------- NULL -------------------
+    // ------- NONE -------------------
+
+    // printf("[+] read stream ok! dexfile== NULL ? : %d\n",dexfile  == NULL);
+
+    // std::cout<<""
     // exit stream
     if (stream) tb_stream_exit(stream);
     stream = tb_null;
@@ -359,15 +373,24 @@ dx_file_ref_t dx_file_load_from_url(tb_char_t const* url, tb_bool_t checksum)
         // exit it
         if (data) tb_free(data);
         data = tb_null;
+        printf("[-] Oops! prepare error\n");
     }
-
+    // printf("[+] prepare ok !!\n");
     // ok?
     return dexfile;
 }
+
+
 dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_bool_t checksum)
 {
+
+
+
+    printf("[+]: starting load dexfile from input data[0]: %c ,data[1]: %c ,data[2]:%c, size: %zu  \n",*data,*(data+1),*(data+2),size);
     // check
     tb_assert_and_check_return_val(data && size, tb_null);
+
+    // printf("check input data ok !!");
 
     // done
     tb_bool_t           ok = tb_false;
@@ -375,6 +398,8 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
     dx_header_ref_t header = tb_null;
     do
     {
+
+        // printf("[+] check size > dx_header_t : \n");
         // check the data size
         tb_assert_and_check_break(size > sizeof(dx_header_t));
 
@@ -386,9 +411,13 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
         dexfile->base       = data;
         dexfile->owner      = tb_false;
 
+        // printf("[+] read dex info: \n");
+
         // is the optimized header?
         if (!tb_memcmp(data, DX_OPT_MAGIC, 4))
         {
+
+            tb_trace_d("Got optimized dexfile");
             // the optimized header
             dx_header_opt_ref_t header_opt = (dx_header_opt_ref_t)data;
 
@@ -410,6 +439,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
             size = header_opt->dex_length;
         }
 
+        printf("[+] start parsing dex data: %p, size: %zu\n",data,size);
         // save dex data and size
         dexfile->data = data;
         dexfile->size = size;
@@ -427,7 +457,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
         if (header->file_size != size) 
         {
             // trace
-            tb_trace_e("stored file size: %u != %lu", header->file_size, size);
+            printf("[-] stored file size: %u != %lu", header->file_size, size);
             break;
         }
 
@@ -435,7 +465,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
         if (!header->class_defs_size) 
         {
             //trace
-            tb_trace_e("dex file has no classes!");
+            printf("[-] dex file has no classes!");
             break;
         }
 
@@ -449,13 +479,15 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
         dexfile->class_defs = (dx_class_def_ref_t)  (data + header->class_defs_off);
         dexfile->link_data  = (dx_link_ref_t)       (data + header->link_off);
 
+        printf("[+] read maps item ok, class count: %zu \n[+] header->field_ids_size: %zu \n[+] header->method_ids_size: %zu \n",header->class_defs_size,header->field_ids_size,header->method_ids_size);
         // init classes
         dexfile->classes = (tb_pointer_t*)tb_nalloc0_type(header->class_defs_size, dx_class_t*);
         tb_assert_and_check_break(dexfile->classes);
 
         // init fields
         dexfile->fields = (tb_pointer_t*)tb_nalloc0_type(header->field_ids_size, dx_field_t*);
-        tb_assert_and_check_break(dexfile->fields);
+        // maybe not fields in dexfile,like hidex
+        // tb_assert_and_check_break(dexfile->fields); //  fixme : close this check 2021-07-11
 
         // init methods
         dexfile->methods = (tb_pointer_t*)tb_nalloc0_type(header->method_ids_size, dx_method_t*);
@@ -463,6 +495,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
 
         // ok
         ok = tb_true;
+        // printf("[+]  read all info done\n");
 
     } while (0);
 
@@ -476,6 +509,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
 
     // trace
     tb_trace_d("load dex: %s", ok? "ok" : "no");
+
 
     // ok?
     return (dx_file_ref_t)dexfile;
