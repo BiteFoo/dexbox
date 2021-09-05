@@ -386,7 +386,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
 
 
 
-    printf("[+]: starting load dexfile from input data[0]: %c ,data[1]: %c ,data[2]:%c, size: %zu  \n",*data,*(data+1),*(data+2),size);
+    // printf("[+]: starting load dexfile from input data[0]: %c ,data[1]: %c ,data[2]:%c, size: %zu  \n",*data,*(data+1),*(data+2),size);
     // check
     tb_assert_and_check_return_val(data && size, tb_null);
 
@@ -486,8 +486,12 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
 
         // init fields
         dexfile->fields = (tb_pointer_t*)tb_nalloc0_type(header->field_ids_size, dx_field_t*);
-        // maybe not fields in dexfile,like hidex
-        // tb_assert_and_check_break(dexfile->fields); //  fixme : close this check 2021-07-11
+        if (header->field_ids_size <=0)
+            printf("[-] Warning: header->field_ids_size <=0\n");
+        // else
+        // maybe no fields in dexfile,like hidex
+        if (header->field_ids_size>0)
+            tb_assert_and_check_break(dexfile->fields); //  fixme : close this check 2021-07-11
 
         // init methods
         dexfile->methods = (tb_pointer_t*)tb_nalloc0_type(header->method_ids_size, dx_method_t*);
@@ -511,6 +515,7 @@ dx_file_ref_t dx_file_load_from_data(tb_byte_t const* data, tb_size_t size, tb_b
     tb_trace_d("load dex: %s", ok? "ok" : "no");
 
 
+    printf("[+] Reading DexFile data success.\n");
     // ok?
     return (dx_file_ref_t)dexfile;
 }
@@ -914,6 +919,16 @@ tb_void_t dx_file_dump(dx_file_ref_t file)
     {
         // dump class
         dx_class_ref_t clazz = dx_file_class(file, class_idx);
+
+        tb_char_t* class_name  = dx_class_descriptor(clazz);
+        // ------------ debug use ---------------
+        if (NULL == class_name) continue;
+        printf("-> className: %s\n",class_name);
+        // -------------------------------------
+
+
+        // ------- origin calll --------------
+        
         if (clazz)
         {
             // dump class
